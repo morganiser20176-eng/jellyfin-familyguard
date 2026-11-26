@@ -45,6 +45,12 @@ Restart Jellyfin after installation when requested, then open **Dashboard → Pl
 
 The first public release targets Jellyfin `10.11.11` and .NET 9. Jellyfin plugins are ABI-sensitive: do not install this release on a server version outside its declared compatibility range.
 
+## Community and feedback
+
+Questions, compatibility reports, and feature ideas are welcome in the
+[FamilyGuard Discussions](https://github.com/morganiser20176-eng/jellyfin-familyguard/discussions).
+Please include the Jellyfin server version when reporting an issue.
+
 ## Development and releases
 
 ```bash

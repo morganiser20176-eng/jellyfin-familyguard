@@ -45,6 +45,12 @@ Redémarrez Jellyfin si demandé, puis ouvrez **Tableau de bord → Plugins → 
 
 La première version publique cible Jellyfin `10.11.11` et .NET 9. Les plugins Jellyfin dépendent de l'ABI : n'installez pas cette version sur un serveur en dehors de la plage déclarée.
 
+## Communauté et retours
+
+Les questions, rapports de compatibilité et propositions d'évolution sont les bienvenus dans les
+[Discussions FamilyGuard](https://github.com/morganiser20176-eng/jellyfin-familyguard/discussions).
+Indiquez la version de votre serveur Jellyfin lorsque vous signalez un problème.
+
 ## Licence
 
 FamilyGuard est distribué sous [GNU GPL v3.0](LICENSE).
