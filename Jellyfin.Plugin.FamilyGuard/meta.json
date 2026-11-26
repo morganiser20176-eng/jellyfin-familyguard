@@ -1,0 +1,15 @@
+{
+  "category": "General",
+  "changelog": "Public-ready release: generic defaults, bilingual documentation, and external repository support.",
+  "description": "Local parental review queues, profile rules, and a private decision log for Jellyfin.",
+  "guid": "cace56d8-9077-4ced-b014-a0d703d83876",
+  "name": "FamilyGuard",
+  "overview": "Local parental review workflow for Jellyfin.",
+  "owner": "FamilyGuard contributors",
+  "targetAbi": "10.11.11.0",
+  "timestamp": "2026-11-26T19:00:00.0000000Z",
+  "version": "0.3.0.0",
+  "status": "Active",
+  "autoUpdate": false,
+  "assemblies": []
+}

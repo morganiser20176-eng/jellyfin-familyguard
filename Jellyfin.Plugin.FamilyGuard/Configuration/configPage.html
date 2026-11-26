@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>FamilyGuard</title>
+</head>
+<body>
+    <div id="FamilyGuardConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
+        <div data-role="content">
+            <div class="content-primary">
+                <h1>FamilyGuard</h1>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="FamilyGuardLanguage" data-i18n="language">Language</label>
+                    <select is="emby-select" id="FamilyGuardLanguage" class="emby-select-withcolor emby-select" style="max-width:14em;">
+                        <option value="en">English</option>
+                        <option value="fr">Français</option>
+                    </select>
+                </div>
+                <p class="fieldDescription" data-i18n="intro">Local Jellyfin tag-based parental controls. Media is visible only after an explicit decision or an administrator-enabled safe rule.</p>
+
+                <h2 data-i18n="reviewQueue">Review queue</h2>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="FamilyGuardProfile" data-i18n="protectedProfile">Protected profile</label>
+                    <select is="emby-select" id="FamilyGuardProfile" class="emby-select-withcolor emby-select"></select>
+                </div>
+                <div class="familyguard-actions" style="display:flex; gap:.75em; align-items:center; flex-wrap:wrap; margin:1.25em 0;">
+                    <span id="FamilyGuardCount" style="font-weight:600"></span>
+                    <button is="emby-button" type="button" id="FamilyGuardRefresh" class="raised emby-button"><span data-i18n="refresh">Refresh</span></button>
+                    <button is="emby-button" type="button" id="FamilyGuardApprove" class="raised emby-button"><span data-i18n="approveSelection">Approve selection</span></button>
+                    <button is="emby-button" type="button" id="FamilyGuardReject" class="raised emby-button"><span data-i18n="rejectSelection">Reject selection</span></button>
+                </div>
+                <div id="FamilyGuardEmpty" style="display:none; padding:1em 0;" data-i18n="emptyQueue">No media is awaiting a decision for this profile.</div>
+                <div id="FamilyGuardGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1em;"></div>
+
+                <hr style="margin:2.5em 0;">
+                <h2 data-i18n="classifyRecent">Classify recent media</h2>
+                <p class="fieldDescription" data-i18n="classifyHelp">This action is manual and limited to recent media defined by the profile rules. Always preview first: no changes are made.</p>
+                <div style="display:flex;gap:.75em;flex-wrap:wrap;margin:1em 0 1.5em;">
+                    <button is="emby-button" type="button" id="FamilyGuardPreview" class="raised emby-button"><span data-i18n="preview">Preview</span></button>
+                    <button is="emby-button" type="button" id="FamilyGuardApplyScan" class="raised emby-button"><span data-i18n="applyRules">Classify with rules</span></button>
+                </div>
+
+                <hr style="margin:2.5em 0;">
+                <h2 data-i18n="profilesRules">Profiles and rules</h2>
+                <p class="fieldDescription" data-i18n="profilesHelp">Each profile corresponds to a Jellyfin user configured with its allowed tag in native parental controls. FamilyGuard only adds or removes the two tags below; it never changes files.</p>
+                <div id="FamilyGuardProfiles"></div>
+                <div style="display:flex;gap:.75em;flex-wrap:wrap;margin-top:1em;">
+                    <button is="emby-button" type="button" id="FamilyGuardAddProfile" class="raised emby-button"><span data-i18n="addProfile">Add profile</span></button>
+                    <button is="emby-button" type="button" id="FamilyGuardSaveConfig" class="raised emby-button"><span data-i18n="saveConfiguration">Save configuration</span></button>
+                </div>
+
+                <hr style="margin:2.5em 0;">
+                <h2 data-i18n="decisionLog">Decision log</h2>
+                <p class="fieldDescription" data-i18n="journalHelp">The latest 500 FamilyGuard actions are kept locally in the plugin configuration.</p>
+                <div id="FamilyGuardJournal" style="overflow:auto;"></div>
+            </div>
+        </div>
+        <script type="text/javascript">
+            (function () {
+                var pluginId = 'cace56d8-9077-4ced-b014-a0d703d83876';
+                var page = document.querySelector('#FamilyGuardConfigPage');
+                var profileSelect = page.querySelector('#FamilyGuardProfile');
+                var grid = page.querySelector('#FamilyGuardGrid');
+                var empty = page.querySelector('#FamilyGuardEmpty');
+                var count = page.querySelector('#FamilyGuardCount');
+                var profilesHost = page.querySelector('#FamilyGuardProfiles');
+                var journalHost = page.querySelector('#FamilyGuardJournal');
+                var languageSelect = page.querySelector('#FamilyGuardLanguage');
+                var config = {};
+                var items = [];
+                var language = localStorage.getItem('familyguard-language') || (((navigator.language || '').toLowerCase().indexOf('fr') === 0) ? 'fr' : 'en');
+                var translations = {
+                    en: {
+                        language: 'Language', intro: 'Local Jellyfin tag-based parental controls. Media is visible only after an explicit decision or an administrator-enabled safe rule.',
+                        reviewQueue: 'Review queue', protectedProfile: 'Protected profile', refresh: 'Refresh', approveSelection: 'Approve selection', rejectSelection: 'Reject selection',
+                        emptyQueue: 'No media is awaiting a decision for this profile.', classifyRecent: 'Classify recent media', classifyHelp: 'This action is manual and limited to recent media defined by the profile rules. Always preview first: no changes are made.',
+                        preview: 'Preview', applyRules: 'Classify with rules', profilesRules: 'Profiles and rules', profilesHelp: 'Each profile corresponds to a Jellyfin user configured with its allowed tag in native parental controls. FamilyGuard only adds or removes the two tags below; it never changes files.',
+                        addProfile: 'Add profile', saveConfiguration: 'Save configuration', decisionLog: 'Decision log', journalHelp: 'The latest 500 FamilyGuard actions are kept locally in the plugin configuration.'
+                    },
+                    fr: {
+                        language: 'Langue', intro: 'Contrôle parental local par étiquettes Jellyfin. Un média n\'est visible qu\'après une décision explicite ou une règle sûre activée par l\'administrateur.',
+                        reviewQueue: 'File de validation', protectedProfile: 'Profil protégé', refresh: 'Actualiser', approveSelection: 'Autoriser la sélection', rejectSelection: 'Refuser la sélection',
+                        emptyQueue: 'Aucun média en attente pour ce profil.', classifyRecent: 'Classifier les nouveaux médias', classifyHelp: 'Cette action est manuelle et limitée aux médias récents définis dans les règles du profil. Commence toujours par une prévisualisation : rien n\'est alors modifié.',
+                        preview: 'Prévisualiser', applyRules: 'Classer selon les règles', profilesRules: 'Profils et règles', profilesHelp: 'Chaque profil correspond à un utilisateur Jellyfin configuré avec son étiquette autorisée dans le contrôle parental natif. FamilyGuard ajoute ou retire uniquement les deux étiquettes indiquées ci-dessous ; il ne modifie jamais les fichiers.',
+                        addProfile: 'Ajouter un profil', saveConfiguration: 'Enregistrer la configuration', decisionLog: 'Journal des décisions', journalHelp: 'Les 500 dernières actions de FamilyGuard sont conservées localement dans la configuration du plugin.'
+                    }
+                };
+
+                function t(key) { return translations[language][key] || translations.en[key] || key; }
+                function applyLanguage() {
+                    document.documentElement.lang = language;
+                    languageSelect.value = language;
+                    Array.prototype.slice.call(page.querySelectorAll('[data-i18n]')).forEach(function (element) { element.textContent = t(element.dataset.i18n); });
+                }
+                function localizedMarkup(markup) {
+                    if (language !== 'en') { return markup; }
+                    [
+                        ['Aucun profil configuré. Ajoute-en un, puis associe son étiquette autorisée au compte enfant dans Jellyfin.', 'No profile is configured. Add one, then allow its tag for the child account in Jellyfin.'],
+                        ['Profil ', 'Profile '], ['Retirer', 'Remove'], ['Nom affiché du profil', 'Profile display name'], ['Utilisateur Jellyfin associé (information)', 'Associated Jellyfin user (informational)'],
+                        ['Étiquette autorisée', 'Allowed tag'], ['Étiquette à vérifier', 'Review tag'], ['Règles de classification manuelle', 'Manual classification rules'],
+                        ['Activer les règles pour ce profil', 'Enable rules for this profile'], ['Autoriser automatiquement les correspondances sûres', 'Automatically approve safe matches'],
+                        ['(désactivé = elles vont d’abord dans la file)', '(disabled = they are sent to the queue first)'], ['Films', 'Movies'], ['Séries', 'Series'],
+                        ['Période analysée (1 à 90 jours)', 'Scan window (1 to 90 days)'], ['Classements acceptés, séparés par des virgules', 'Accepted ratings, comma-separated'],
+                        ['Groupes de genres requis : « ; » = ET, « | » = OU', 'Required genre groups: “;” = AND, “|” = OR'], ['Exemple sûr : Animation; Familial|Family|Children|Kids', 'Safe example: Animation; Family|Children|Kids'],
+                        ['Genres bloquants, séparés par des virgules', 'Blocking genres, comma-separated'], ['Aucune décision enregistrée pour ce profil.', 'No decision has been recorded for this profile.'],
+                        ['<th>Date</th><th>Média</th><th>Décision</th><th>Source</th>', '<th>Date</th><th>Media</th><th>Decision</th><th>Source</th>' ]
+                    ].forEach(function (pair) { markup = markup.split(pair[0]).join(pair[1]); });
+                    return markup;
+                }
+
+                function esc(value) {
+                    return String(value || '').replace(/[&<>"']/g, function (character) {
+                        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character];
+                    });
+                }
+                function value(object, pascal, camel, fallback) { return object && (object[pascal] !== undefined ? object[pascal] : (object[camel] !== undefined ? object[camel] : fallback)); }
+                function list(value) { return Array.isArray(value) ? value : []; }
+                function csv(values) { return list(values).join(', '); }
+                function toList(text) { return String(text || '').split(',').map(function (item) { return item.trim(); }).filter(Boolean); }
+                function toGroups(text) { return String(text || '').split(';').map(function (item) { return item.trim(); }).filter(Boolean); }
+                function defaultRules() {
+                    return { Enabled: true, AutoApproveSafeMatches: false, IncludeMovies: true, IncludeSeries: true, LookbackDays: 14,
+                        AllowedRatings: ['G', 'TV-G', 'TV-Y', 'TV-Y7', 'TP', 'FR-TP', 'FR-U'],
+                        RequiredGenreGroups: ['Animation', 'Familial|Family|Children|Kids'],
+                        BlockedGenres: ['Action', 'Crime', 'Horreur', 'Horror', 'Mystère', 'Mystery', 'Thriller'] };
+                }
+                function normalProfile(profile) {
+                    var rules = value(profile, 'Rules', 'rules', {});
+                    var defaults = defaultRules();
+                    return {
+                        Name: value(profile, 'Name', 'name', ''),
+                        UserName: value(profile, 'UserName', 'userName', ''),
+                        AllowedTag: value(profile, 'AllowedTag', 'allowedTag', ''),
+                        ReviewTag: value(profile, 'ReviewTag', 'reviewTag', ''),
+                        Rules: {
+                            Enabled: value(rules, 'Enabled', 'enabled', defaults.Enabled),
+                            AutoApproveSafeMatches: value(rules, 'AutoApproveSafeMatches', 'autoApproveSafeMatches', defaults.AutoApproveSafeMatches),
+                            IncludeMovies: value(rules, 'IncludeMovies', 'includeMovies', defaults.IncludeMovies),
+                            IncludeSeries: value(rules, 'IncludeSeries', 'includeSeries', defaults.IncludeSeries),
+                            LookbackDays: value(rules, 'LookbackDays', 'lookbackDays', defaults.LookbackDays),
+                            AllowedRatings: list(value(rules, 'AllowedRatings', 'allowedRatings', defaults.AllowedRatings)),
+                            RequiredGenreGroups: list(value(rules, 'RequiredGenreGroups', 'requiredGenreGroups', defaults.RequiredGenreGroups)),
+                            BlockedGenres: list(value(rules, 'BlockedGenres', 'blockedGenres', defaults.BlockedGenres))
+                        }
+                    };
+                }
+                function profiles() { return list(value(config, 'Profiles', 'profiles', [])).map(normalProfile); }
+                function setProfiles(next) { config.Profiles = next; delete config.profiles; }
+                function checked(value) { return value ? ' checked' : ''; }
+                function profileCard(profile, index) {
+                    var r = profile.Rules;
+                    return '<section data-profile-index="' + index + '" style="border:1px solid var(--theme-border-color);border-radius:.45em;padding:1em;margin:1em 0;background:var(--theme-card-background);">'
+                        + '<div style="display:flex;justify-content:space-between;gap:1em;align-items:center"><h3 style="margin:0">Profil ' + (index + 1) + '</h3><button is="emby-button" type="button" class="raised emby-button familyguard-remove-profile" data-index="' + index + '"><span>Retirer</span></button></div>'
+                        + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="name" value="' + esc(profile.Name) + '" required><label class="inputLabel">Nom affiché du profil</label></div>'
+                        + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="userName" value="' + esc(profile.UserName) + '"><label class="inputLabel">Utilisateur Jellyfin associé (information)</label></div>'
+                        + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="allowedTag" value="' + esc(profile.AllowedTag) + '" required><label class="inputLabel">Étiquette autorisée</label></div>'
+                        + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="reviewTag" value="' + esc(profile.ReviewTag) + '" required><label class="inputLabel">Étiquette à vérifier</label></div>'
+                        + '<h4>Règles de classification manuelle</h4>'
+                        + '<label style="display:block;margin:.6em 0"><input type="checkbox" data-field="enabled"' + checked(r.Enabled) + '> Activer les règles pour ce profil</label>'
+                        + '<label style="display:block;margin:.6em 0"><input type="checkbox" data-field="autoApprove"' + checked(r.AutoApproveSafeMatches) + '> Autoriser automatiquement les correspondances sûres <span class="fieldDescription">(désactivé = elles vont d’abord dans la file)</span></label>'
+                        + '<label style="display:inline-block;margin:.4em 1em .6em 0"><input type="checkbox" data-field="movies"' + checked(r.IncludeMovies) + '> Films</label>'
+                        + '<label style="display:inline-block;margin:.4em 0 .6em"><input type="checkbox" data-field="series"' + checked(r.IncludeSeries) + '> Séries</label>'
+                        + '<div class="inputContainer"><input is="emby-input" type="number" min="1" max="90" class="emby-input" data-field="lookback" value="' + esc(r.LookbackDays) + '"><label class="inputLabel">Période analysée (1 à 90 jours)</label></div>'
+                        + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="ratings" value="' + esc(csv(r.AllowedRatings)) + '"><label class="inputLabel">Classements acceptés, séparés par des virgules</label></div>'
+                        + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="genreGroups" value="' + esc(r.RequiredGenreGroups.join('; ')) + '"><label class="inputLabel">Groupes de genres requis : « ; » = ET, « | » = OU</label><div class="fieldDescription">Exemple sûr : Animation; Familial|Family|Children|Kids</div></div>'
+                        + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="blockedGenres" value="' + esc(csv(r.BlockedGenres)) + '"><label class="inputLabel">Genres bloquants, séparés par des virgules</label></div>'
+                        + '</section>';
+                }
+                function renderProfiles() { profilesHost.innerHTML = localizedMarkup(profiles().map(profileCard).join('') || '<p class="fieldDescription">Aucun profil configuré. Ajoute-en un, puis associe son étiquette autorisée au compte enfant dans Jellyfin.</p>'); }
+                function rebuildProfileSelect() {
+                    var chosen = profileSelect.value;
+                    var all = profiles();
+                    profileSelect.innerHTML = all.map(function (profile) { return '<option value="' + esc(profile.Name) + '">' + esc(profile.Name) + '</option>'; }).join('');
+                    if (all.some(function (profile) { return profile.Name === chosen; })) { profileSelect.value = chosen; }
+                }
+                function selectedIds() { return Array.prototype.slice.call(grid.querySelectorAll('input[data-id]:checked')).map(function (input) { return input.dataset.id; }); }
+                function renderQueue() {
+                    grid.innerHTML = items.map(function (item) {
+                        var details = [item.type || item.Type, item.year || item.Year, item.rating || item.Rating].filter(Boolean).join(' · ');
+                        var genres = (item.genres || item.Genres || []).join(', ');
+                        var title = item.name || item.Name;
+                        var id = item.id || item.Id;
+                        return '<article style="border:1px solid var(--theme-border-color);border-radius:.4em;overflow:hidden;background:var(--theme-card-background);">'
+                            + '<img loading="lazy" alt="" style="display:block;width:100%;aspect-ratio:2/3;object-fit:cover;background:#222" src="' + ApiClient.getUrl('Items/' + encodeURIComponent(id) + '/Images/Primary?maxWidth=360') + '">'
+                            + '<div style="padding:.75em"><label style="display:flex;gap:.5em;align-items:flex-start"><input type="checkbox" data-id="' + esc(id) + '"><span style="font-weight:600">' + esc(title) + '</span></label>'
+                            + '<div class="fieldDescription" style="margin-top:.45em">' + esc(details) + '</div><div class="fieldDescription">' + esc(genres) + '</div>'
+                            + (item.overview || item.Overview ? '<p style="font-size:.9em;line-height:1.35;max-height:5.5em;overflow:hidden">' + esc(item.overview || item.Overview) + '</p>' : '') + '</div></article>';
+                    }).join('');
+                    empty.style.display = items.length ? 'none' : 'block';
+                    count.textContent = language === 'fr' ? items.length + ' média' + (items.length > 1 ? 's' : '') + ' à vérifier' : items.length + ' media awaiting review';
+                }
+                function loadQueue() {
+                    if (!profileSelect.value) { items = []; renderQueue(); return Promise.resolve(); }
+                    Dashboard.showLoadingMsg();
+                    return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('FamilyGuard/Queue?profile=' + encodeURIComponent(profileSelect.value)) }).then(function (data) {
+                        items = data.items || data.Items || []; renderQueue();
+                    }).catch(function () { Dashboard.alert('Impossible de charger la file FamilyGuard.'); }).finally(function () { Dashboard.hideLoadingMsg(); });
+                }
+                function renderJournal(entries) {
+                    var rows = (entries || []).map(function (entry) {
+                        var when = entry.createdUtc || entry.CreatedUtc;
+                        return '<tr><td>' + esc(when ? new Date(when).toLocaleString() : '') + '</td><td>' + esc(entry.itemName || entry.ItemName) + '</td><td>' + esc(entry.action || entry.Action) + '</td><td>' + esc(entry.source || entry.Source) + '</td></tr>';
+                    }).join('');
+                    journalHost.innerHTML = localizedMarkup(rows ? '<table class="tbl"><thead><tr><th>Date</th><th>Média</th><th>Décision</th><th>Source</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<p class="fieldDescription">Aucune décision enregistrée pour ce profil.</p>');
+                }
+                function loadJournal() {
+                    if (!profileSelect.value) { journalHost.innerHTML = ''; return Promise.resolve(); }
+                    return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('FamilyGuard/Journal?profile=' + encodeURIComponent(profileSelect.value) + '&take=100') }).then(function (entries) {
+                        renderJournal(entries);
+                    }).catch(function () {
+                        if (!journalHost.innerHTML) { journalHost.innerHTML = '<p class="fieldDescription">Impossible d’actualiser le journal.</p>'; }
+                    });
+                }
+                function decide(action) {
+                    var ids = selectedIds();
+                    if (!ids.length) { Dashboard.alert('Sélectionne au moins un média.'); return; }
+                    var verb = action === 'approve' ? 'autoriser' : 'refuser';
+                    Dashboard.confirm('Confirmer : ' + verb + ' ' + ids.length + ' média' + (ids.length > 1 ? 's' : '') + ' ?', 'FamilyGuard', function (ok) {
+                        if (!ok) { return; }
+                        Dashboard.showLoadingMsg();
+                        ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('FamilyGuard/Decisions'), contentType: 'application/json', data: JSON.stringify({ profile: profileSelect.value, action: action, itemIds: ids }) })
+                            .then(function () { return Promise.all([loadQueue(), loadJournal()]); })
+                            .catch(function () { Dashboard.alert('La décision n\'a pas pu être enregistrée.'); })
+                            .finally(function () { Dashboard.hideLoadingMsg(); });
+                    });
+                }
+                function readProfilesForm() {
+                    return Array.prototype.slice.call(profilesHost.querySelectorAll('[data-profile-index]')).map(function (card) {
+                        function input(field) { return card.querySelector('[data-field="' + field + '"]'); }
+                        function text(field) { return input(field).value.trim(); }
+                        function bool(field) { return input(field).checked; }
+                        return { Name: text('name'), UserName: text('userName'), AllowedTag: text('allowedTag'), ReviewTag: text('reviewTag'), Rules: {
+                            Enabled: bool('enabled'), AutoApproveSafeMatches: bool('autoApprove'), IncludeMovies: bool('movies'), IncludeSeries: bool('series'),
+                            LookbackDays: Math.max(1, Math.min(90, Number(text('lookback')) || 14)), AllowedRatings: toList(text('ratings')),
+                            RequiredGenreGroups: toGroups(text('genreGroups')), BlockedGenres: toList(text('blockedGenres')) } };
+                    });
+                }
+                function saveConfig() {
+                    var next = readProfilesForm();
+                    var names = {};
+                    var invalid = next.some(function (profile) {
+                        var key = profile.Name.toLowerCase();
+                        if (!profile.Name || !profile.AllowedTag || !profile.ReviewTag || names[key]) { return true; }
+                        names[key] = true; return false;
+                    });
+                    if (invalid) { Dashboard.alert('Chaque profil doit avoir un nom unique et deux étiquettes non vides.'); return; }
+                    setProfiles(next);
+                    Dashboard.showLoadingMsg();
+                    ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
+                        rebuildProfileSelect(); renderProfiles();
+                        return Promise.all([loadQueue(), loadJournal()]);
+                    }).then(function () { Dashboard.alert('Configuration FamilyGuard enregistrée.'); })
+                      .catch(function () { Dashboard.alert('Impossible d\'enregistrer la configuration.'); })
+                      .finally(function () { Dashboard.hideLoadingMsg(); });
+                }
+                function runScan(apply) {
+                    if (!profileSelect.value) { Dashboard.alert('Configure puis enregistre au moins un profil.'); return; }
+                    function start() {
+                        Dashboard.showLoadingMsg();
+                        ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('FamilyGuard/Scan'), contentType: 'application/json', data: JSON.stringify({ profile: profileSelect.value, apply: apply }) }).then(function (result) {
+                            var considered = value(result, 'Considered', 'considered', 0);
+                            var safeMatches = value(result, 'SafeMatches', 'safeMatches', 0);
+                            var reviewCandidates = value(result, 'ReviewCandidates', 'reviewCandidates', 0);
+                            var updated = value(result, 'Updated', 'updated', 0);
+                            var message = considered + ' média(s) récent(s) vérifié(s) · ' + safeMatches + ' correspondance(s) sûre(s) · ' + reviewCandidates + ' métadonnée(s) incomplète(s)' + (apply ? ' · ' + updated + ' média(s) modifié(s).' : '. Aucune modification effectuée.');
+                            Dashboard.alert({ title: 'FamilyGuard', message: message });
+                            if (apply) { return Promise.all([loadQueue(), loadJournal()]); }
+                        }).catch(function (error) { Dashboard.alert(error && error.responseJSON ? error.responseJSON : 'La classification n\'a pas pu être effectuée.'); }).finally(function () { Dashboard.hideLoadingMsg(); });
+                    }
+                    if (!apply) { start(); return; }
+                    Dashboard.confirm('Classer les nouveaux médias selon les règles de « ' + profileSelect.value + ' » ?', 'FamilyGuard', function (ok) { if (ok) { start(); } });
+                }
+                function loadConfig() {
+                    return ApiClient.getPluginConfiguration(pluginId).then(function (loaded) {
+                        config = loaded || {}; setProfiles(profiles()); renderProfiles(); rebuildProfileSelect();
+                        renderJournal(value(config, 'DecisionLog', 'decisionLog', []));
+                    });
+                }
+                page.addEventListener('pageshow', function () { applyLanguage(); loadConfig().then(function () { return Promise.all([loadQueue(), loadJournal()]); }); });
+                languageSelect.addEventListener('change', function () { language = languageSelect.value; localStorage.setItem('familyguard-language', language); applyLanguage(); renderProfiles(); renderQueue(); loadJournal(); });
+                page.querySelector('#FamilyGuardRefresh').addEventListener('click', function () { Promise.all([loadQueue(), loadJournal()]); });
+                page.querySelector('#FamilyGuardApprove').addEventListener('click', function () { decide('approve'); });
+                page.querySelector('#FamilyGuardReject').addEventListener('click', function () { decide('reject'); });
+                page.querySelector('#FamilyGuardPreview').addEventListener('click', function () { runScan(false); });
+                page.querySelector('#FamilyGuardApplyScan').addEventListener('click', function () { runScan(true); });
+                page.querySelector('#FamilyGuardAddProfile').addEventListener('click', function () { var all = profiles(); all.push(normalProfile({ Name: language === 'fr' ? 'Nouveau profil' : 'New profile', AllowedTag: 'FamilyGuard-Allowed', ReviewTag: 'FamilyGuard-Review' })); setProfiles(all); renderProfiles(); });
+                page.querySelector('#FamilyGuardSaveConfig').addEventListener('click', saveConfig);
+                profilesHost.addEventListener('click', function (event) { var button = event.target.closest('.familyguard-remove-profile'); if (!button) { return; } var all = profiles(); all.splice(Number(button.dataset.index), 1); setProfiles(all); renderProfiles(); });
+                profileSelect.addEventListener('change', function () { Promise.all([loadQueue(), loadJournal()]); });
+            }());
+        </script>
+    </div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+name: Package and publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Build the plugin
+        run: dotnet build FamilyGuard.slnx --configuration Release
+      - name: Package release and repository manifest
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          DLL="Jellyfin.Plugin.FamilyGuard/bin/Release/net9.0/Jellyfin.Plugin.FamilyGuard.dll"
+          test -f "$DLL"
+          mkdir -p dist
+          ZIP="FamilyGuard-${VERSION}.zip"
+          zip -j "dist/${ZIP}" "$DLL"
+          CHECKSUM="$(sha256sum "dist/${ZIP}" | awk '{print $1}')"
+          SOURCE_URL="${SERVER_URL}/${REPOSITORY}/releases/download/${TAG}/${ZIP}"
+          TIMESTAMP="$(date --utc +%Y-%m-%dT%H:%M:%S.0000000Z)"
+          cat > dist/manifest.json <<EOF
+          [
+            {
+              "category": "General",
+              "description": "Local parental review queues, profile rules, and a private decision log for Jellyfin.",
+              "guid": "cace56d8-9077-4ced-b014-a0d703d83876",
+              "name": "FamilyGuard",
+              "overview": "Local parental review workflow for Jellyfin.",
+              "owner": "FamilyGuard contributors",
+              "versions": [
+                {
+                  "changelog": "See the GitHub release notes.",
+                  "targetAbi": "10.11.11.0",
+                  "timestamp": "${TIMESTAMP}",
+                  "version": "${VERSION}",
+                  "sourceUrl": "${SOURCE_URL}",
+                  "checksum": "${CHECKSUM}"
+                }
+              ]
+            }
+          ]
+          EOF
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/FamilyGuard-*.zip dist/manifest.json --clobber
