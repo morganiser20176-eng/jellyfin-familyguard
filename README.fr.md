@@ -29,7 +29,7 @@ Consultez la [notice de confidentialité](PRIVACY.md) et la [politique de sécur
 Lorsqu'une version publique sera disponible, ajoutez cette adresse dans **Tableau de bord → Plugins → Gérer les dépôts → Ajouter** :
 
 ```text
-https://github.com/VOTRE_COMPTE_GITHUB/jellyfin-familyguard/releases/latest/download/manifest.json
+https://github.com/morganiser20176-eng/jellyfin-familyguard/releases/latest/download/manifest.json
 ```
 
 Redémarrez Jellyfin si demandé, puis ouvrez **Tableau de bord → Plugins → FamilyGuard**.
