@@ -17,6 +17,25 @@ public sealed class ProtectedProfile
     /// <summary>Gets or sets the optional Jellyfin user name associated with this rule set.</summary>
     public string UserName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Gets or sets the stable Jellyfin user identifier associated with this profile.
+    /// An empty value keeps the profile in review-only mode.
+    /// </summary>
+    public string UserId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether native Jellyfin tag filtering should be enforced
+    /// for the associated user. This setting never changes a user policy until an administrator
+    /// explicitly applies the previewed change.
+    /// </summary>
+    public bool NativeTagProtectionEnabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the allowed tags previously written by FamilyGuard. They are used to make
+    /// a later update or removal reversible without replacing unrelated administrator settings.
+    /// </summary>
+    public List<string> ManagedAllowedTags { get; set; } = [];
+
     /// <summary>Gets or sets the conservative rules used by the optional manual classifier.</summary>
     public ProfileRules Rules { get; set; } = new();
 }

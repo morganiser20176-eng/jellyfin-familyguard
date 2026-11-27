@@ -7,12 +7,15 @@ FamilyGuard is a local-first parental review workflow for Jellyfin. It helps an 
 ## What it does
 
 - Supports multiple protected profiles, each with an allowed tag and a review tag.
+- Can link a protected profile to a Jellyfin user and preview a reversible native allowed-tag policy update. When explicitly applied, the Jellyfin server enforces that policy for every authenticated client.
 - Lets an administrator approve or reject a selection from a review queue.
 - Provides conservative, opt-in rules for a manual scan of recently added media.
 - Keeps the latest 500 tag decisions in the plugin's local Jellyfin configuration.
 - Adds an administrative FamilyGuard entry in Jellyfin.
 
 FamilyGuard complements Jellyfin's native parental controls. For each child account, keep native restrictions enabled and allow only that profile's configured **allowed tag**.
+
+Native protection is opt-in. FamilyGuard shows the exact before/after tag policy and requires a second confirmation before changing it. It preserves unrelated allowed tags and can remove only the tags it previously added.
 
 ## Privacy and safety
 
