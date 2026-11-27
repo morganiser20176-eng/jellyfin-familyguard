@@ -432,7 +432,7 @@ public sealed class FamilyGuardController : ControllerBase
         await _userManager.UpdatePolicyAsync(user.Id, policy).ConfigureAwait(false);
 
         selectedProfile.UserName = user.Username;
-        selectedProfile.ManagedAllowedTags = restore ? [] : [selectedProfile.AllowedTag];
+        selectedProfile.ManagedAllowedTags = restore ? [] : preview.AddedAllowedTags.ToList();
         selectedProfile.NativeTagProtectionEnabled = !restore;
         SaveProfileConfiguration();
         WriteJournal(
