@@ -50,6 +50,16 @@
                 </div>
 
                 <hr style="margin:2.5em 0;">
+                <h2 data-i18n="nativeProtection">Native Jellyfin protection</h2>
+                <p class="fieldDescription" data-i18n="nativeProtectionHelp">Apply the selected profile's allowed tag directly to its linked Jellyfin account. This is enforced by the server on every authenticated client. Review the preview before applying; FamilyGuard preserves unrelated allowed tags and can remove only the tags it previously managed.</p>
+                <div id="FamilyGuardNativePolicy" class="fieldDescription" style="margin:1em 0;"></div>
+                <div style="display:flex;gap:.75em;flex-wrap:wrap;margin:1em 0 1.5em;">
+                    <button is="emby-button" type="button" id="FamilyGuardPreviewNativePolicy" class="raised emby-button"><span data-i18n="previewPolicy">Preview policy</span></button>
+                    <button is="emby-button" type="button" id="FamilyGuardApplyNativePolicy" class="raised emby-button"><span data-i18n="applyNativePolicy">Apply native protection</span></button>
+                    <button is="emby-button" type="button" id="FamilyGuardRestoreNativePolicy" class="raised emby-button"><span data-i18n="restoreNativePolicy">Remove FamilyGuard protection</span></button>
+                </div>
+
+                <hr style="margin:2.5em 0;">
                 <h2 data-i18n="decisionLog">Decision log</h2>
                 <p class="fieldDescription" data-i18n="journalHelp">The latest 500 FamilyGuard actions are kept locally in the plugin configuration.</p>
                 <div id="FamilyGuardJournal" style="overflow:auto;"></div>
@@ -65,9 +75,11 @@
                 var count = page.querySelector('#FamilyGuardCount');
                 var profilesHost = page.querySelector('#FamilyGuardProfiles');
                 var journalHost = page.querySelector('#FamilyGuardJournal');
+                var nativePolicyHost = page.querySelector('#FamilyGuardNativePolicy');
                 var languageSelect = page.querySelector('#FamilyGuardLanguage');
                 var config = {};
                 var items = [];
+                var jellyfinUsers = [];
                 var language = localStorage.getItem('familyguard-language') || (((navigator.language || '').toLowerCase().indexOf('fr') === 0) ? 'fr' : 'en');
                 var translations = {
                     en: {
@@ -75,14 +87,18 @@
                         reviewQueue: 'Review queue', protectedProfile: 'Protected profile', refresh: 'Refresh', approveSelection: 'Approve selection', rejectSelection: 'Reject selection',
                         emptyQueue: 'No media is awaiting a decision for this profile.', classifyRecent: 'Classify recent media', classifyHelp: 'This action is manual and limited to recent media defined by the profile rules. Always preview first: no changes are made.',
                         preview: 'Preview', applyRules: 'Classify with rules', profilesRules: 'Profiles and rules', profilesHelp: 'Each profile corresponds to a Jellyfin user configured with its allowed tag in native parental controls. FamilyGuard only adds or removes the two tags below; it never changes files.',
-                        addProfile: 'Add profile', saveConfiguration: 'Save configuration', decisionLog: 'Decision log', journalHelp: 'The latest 500 FamilyGuard actions are kept locally in the plugin configuration.'
+                        addProfile: 'Add profile', saveConfiguration: 'Save configuration', decisionLog: 'Decision log', journalHelp: 'The latest 500 FamilyGuard actions are kept locally in the plugin configuration.',
+                        nativeProtection: 'Native Jellyfin protection', nativeProtectionHelp: 'Apply the selected profile’s allowed tag directly to its linked Jellyfin account. This is enforced by the server on every authenticated client. Review the preview before applying; FamilyGuard preserves unrelated allowed tags and can remove only the tags it previously managed.',
+                        previewPolicy: 'Preview policy', applyNativePolicy: 'Apply native protection', restoreNativePolicy: 'Remove FamilyGuard protection'
                     },
                     fr: {
                         language: 'Langue', intro: 'Contrôle parental local par étiquettes Jellyfin. Un média n\'est visible qu\'après une décision explicite ou une règle sûre activée par l\'administrateur.',
                         reviewQueue: 'File de validation', protectedProfile: 'Profil protégé', refresh: 'Actualiser', approveSelection: 'Autoriser la sélection', rejectSelection: 'Refuser la sélection',
                         emptyQueue: 'Aucun média en attente pour ce profil.', classifyRecent: 'Classifier les nouveaux médias', classifyHelp: 'Cette action est manuelle et limitée aux médias récents définis dans les règles du profil. Commence toujours par une prévisualisation : rien n\'est alors modifié.',
                         preview: 'Prévisualiser', applyRules: 'Classer selon les règles', profilesRules: 'Profils et règles', profilesHelp: 'Chaque profil correspond à un utilisateur Jellyfin configuré avec son étiquette autorisée dans le contrôle parental natif. FamilyGuard ajoute ou retire uniquement les deux étiquettes indiquées ci-dessous ; il ne modifie jamais les fichiers.',
-                        addProfile: 'Ajouter un profil', saveConfiguration: 'Enregistrer la configuration', decisionLog: 'Journal des décisions', journalHelp: 'Les 500 dernières actions de FamilyGuard sont conservées localement dans la configuration du plugin.'
+                        addProfile: 'Ajouter un profil', saveConfiguration: 'Enregistrer la configuration', decisionLog: 'Journal des décisions', journalHelp: 'Les 500 dernières actions de FamilyGuard sont conservées localement dans la configuration du plugin.',
+                        nativeProtection: 'Protection native Jellyfin', nativeProtectionHelp: 'Applique directement l’étiquette autorisée du profil sélectionné au compte Jellyfin associé. Cette protection est appliquée par le serveur sur tous les clients authentifiés. Consultez l’aperçu avant de confirmer : FamilyGuard conserve les autres étiquettes autorisées et peut retirer uniquement celles qu’il a lui-même gérées.',
+                        previewPolicy: 'Prévisualiser la politique', applyNativePolicy: 'Activer la protection native', restoreNativePolicy: 'Retirer la protection FamilyGuard'
                     }
                 };
 
@@ -96,8 +112,9 @@
                     if (language !== 'en') { return markup; }
                     [
                         ['Aucun profil configuré. Ajoute-en un, puis associe son étiquette autorisée au compte enfant dans Jellyfin.', 'No profile is configured. Add one, then allow its tag for the child account in Jellyfin.'],
-                        ['Profil ', 'Profile '], ['Retirer', 'Remove'], ['Nom affiché du profil', 'Profile display name'], ['Utilisateur Jellyfin associé (information)', 'Associated Jellyfin user (informational)'],
+                        ['Profil ', 'Profile '], ['Retirer', 'Remove'], ['Nom affiché du profil', 'Profile display name'], ['Compte Jellyfin associé', 'Linked Jellyfin account'],
                         ['Étiquette autorisée', 'Allowed tag'], ['Étiquette à vérifier', 'Review tag'], ['Règles de classification manuelle', 'Manual classification rules'],
+                        ['Activer la protection native par étiquette', 'Enable native tag protection'], ['(aperçu et confirmation requis)', '(preview and confirmation required)'],
                         ['Activer les règles pour ce profil', 'Enable rules for this profile'], ['Autoriser automatiquement les correspondances sûres', 'Automatically approve safe matches'],
                         ['(désactivé = elles vont d’abord dans la file)', '(disabled = they are sent to the queue first)'], ['Films', 'Movies'], ['Séries', 'Series'],
                         ['Période analysée (1 à 90 jours)', 'Scan window (1 to 90 days)'], ['Classements acceptés, séparés par des virgules', 'Accepted ratings, comma-separated'],
@@ -130,8 +147,11 @@
                     return {
                         Name: value(profile, 'Name', 'name', ''),
                         UserName: value(profile, 'UserName', 'userName', ''),
+                        UserId: value(profile, 'UserId', 'userId', ''),
                         AllowedTag: value(profile, 'AllowedTag', 'allowedTag', ''),
                         ReviewTag: value(profile, 'ReviewTag', 'reviewTag', ''),
+                        NativeTagProtectionEnabled: value(profile, 'NativeTagProtectionEnabled', 'nativeTagProtectionEnabled', false),
+                        ManagedAllowedTags: list(value(profile, 'ManagedAllowedTags', 'managedAllowedTags', [])),
                         Rules: {
                             Enabled: value(rules, 'Enabled', 'enabled', defaults.Enabled),
                             AutoApproveSafeMatches: value(rules, 'AutoApproveSafeMatches', 'autoApproveSafeMatches', defaults.AutoApproveSafeMatches),
@@ -147,14 +167,28 @@
                 function profiles() { return list(value(config, 'Profiles', 'profiles', [])).map(normalProfile); }
                 function setProfiles(next) { config.Profiles = next; delete config.profiles; }
                 function checked(value) { return value ? ' checked' : ''; }
+                function userOptions(profile) {
+                    var selected = profile.UserId || '';
+                    return '<option value="">' + esc(language === 'fr' ? 'Sélectionner un compte Jellyfin…' : 'Select a Jellyfin account…') + '</option>'
+                        + jellyfinUsers.map(function (user) {
+                            var label = user.name || user.Name;
+                            var id = user.id || user.Id;
+                            var administrator = user.isAdministrator || user.IsAdministrator;
+                            var disabled = user.isDisabled || user.IsDisabled;
+                            if (administrator) { label += language === 'fr' ? ' (administrateur)' : ' (administrator)'; }
+                            if (disabled) { label += language === 'fr' ? ' (désactivé)' : ' (disabled)'; }
+                            return '<option value="' + esc(id) + '"' + (id === selected ? ' selected' : '') + '>' + esc(label) + '</option>';
+                        }).join('');
+                }
                 function profileCard(profile, index) {
                     var r = profile.Rules;
                     return '<section data-profile-index="' + index + '" style="border:1px solid var(--theme-border-color);border-radius:.45em;padding:1em;margin:1em 0;background:var(--theme-card-background);">'
                         + '<div style="display:flex;justify-content:space-between;gap:1em;align-items:center"><h3 style="margin:0">Profil ' + (index + 1) + '</h3><button is="emby-button" type="button" class="raised emby-button familyguard-remove-profile" data-index="' + index + '"><span>Retirer</span></button></div>'
                         + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="name" value="' + esc(profile.Name) + '" required><label class="inputLabel">Nom affiché du profil</label></div>'
-                        + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="userName" value="' + esc(profile.UserName) + '"><label class="inputLabel">Utilisateur Jellyfin associé (information)</label></div>'
+                        + '<div class="selectContainer"><select is="emby-select" class="emby-select-withcolor emby-select" data-field="userId">' + userOptions(profile) + '</select><label class="selectLabel">Compte Jellyfin associé</label></div>'
                         + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="allowedTag" value="' + esc(profile.AllowedTag) + '" required><label class="inputLabel">Étiquette autorisée</label></div>'
                         + '<div class="inputContainer"><input is="emby-input" class="emby-input" data-field="reviewTag" value="' + esc(profile.ReviewTag) + '" required><label class="inputLabel">Étiquette à vérifier</label></div>'
+                        + '<label style="display:block;margin:.75em 0"><input type="checkbox" data-field="nativeTagProtection"' + checked(profile.NativeTagProtectionEnabled) + '> Activer la protection native par étiquette <span class="fieldDescription">(aperçu et confirmation requis)</span></label>'
                         + '<h4>Règles de classification manuelle</h4>'
                         + '<label style="display:block;margin:.6em 0"><input type="checkbox" data-field="enabled"' + checked(r.Enabled) + '> Activer les règles pour ce profil</label>'
                         + '<label style="display:block;margin:.6em 0"><input type="checkbox" data-field="autoApprove"' + checked(r.AutoApproveSafeMatches) + '> Autoriser automatiquement les correspondances sûres <span class="fieldDescription">(désactivé = elles vont d’abord dans la file)</span></label>'
@@ -211,6 +245,48 @@
                         if (!journalHost.innerHTML) { journalHost.innerHTML = '<p class="fieldDescription">Impossible d’actualiser le journal.</p>'; }
                     });
                 }
+                function renderNativePolicy(preview) {
+                    var current = list(preview.currentAllowedTags || preview.CurrentAllowedTags);
+                    var desired = list(preview.desiredAllowedTags || preview.DesiredAllowedTags);
+                    var added = list(preview.addedAllowedTags || preview.AddedAllowedTags);
+                    var removed = list(preview.removedAllowedTags || preview.RemovedAllowedTags);
+                    var warning = preview.warning || preview.Warning;
+                    if (warning) {
+                        nativePolicyHost.innerHTML = '<strong>' + esc(language === 'fr' ? 'Action non disponible : ' : 'Action unavailable: ') + '</strong>' + esc(warning);
+                        return;
+                    }
+                    var label = language === 'fr' ? 'Compte : ' : 'Account: ';
+                    var before = language === 'fr' ? 'Étiquettes autorisées actuelles : ' : 'Current allowed tags: ';
+                    var after = language === 'fr' ? 'Après application : ' : 'After applying: ';
+                    var changes = language === 'fr' ? 'Ajoutées : ' : 'Added: ';
+                    var removals = language === 'fr' ? 'Retirées : ' : 'Removed: ';
+                    nativePolicyHost.innerHTML = '<div><strong>' + esc(label) + '</strong>' + esc(preview.userName || preview.UserName || '') + '</div>'
+                        + '<div>' + esc(before) + esc(current.join(', ') || '—') + '</div>'
+                        + '<div>' + esc(after) + esc(desired.join(', ') || '—') + '</div>'
+                        + '<div>' + esc(changes) + esc(added.join(', ') || '—') + '</div>'
+                        + '<div>' + esc(removals) + esc(removed.join(', ') || '—') + '</div>';
+                }
+                function loadNativePolicy() {
+                    if (!profileSelect.value) { nativePolicyHost.innerHTML = ''; return Promise.resolve(); }
+                    return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('FamilyGuard/NativePolicy/Preview?profile=' + encodeURIComponent(profileSelect.value)) })
+                        .then(renderNativePolicy)
+                        .catch(function () { nativePolicyHost.textContent = language === 'fr' ? 'Impossible de prévisualiser la protection native.' : 'Unable to preview native protection.'; });
+                }
+                function changeNativePolicy(action) {
+                    if (!profileSelect.value) { return; }
+                    var endpoint = action === 'restore' ? 'FamilyGuard/NativePolicy/Restore' : 'FamilyGuard/NativePolicy/Apply';
+                    var message = action === 'restore'
+                        ? (language === 'fr' ? 'Retirer uniquement les étiquettes gérées par FamilyGuard pour ce compte ?' : 'Remove only the tags managed by FamilyGuard for this account?')
+                        : (language === 'fr' ? 'Appliquer la protection native Jellyfin affichée dans l’aperçu ?' : 'Apply the native Jellyfin protection shown in the preview?');
+                    Dashboard.confirm(message, 'FamilyGuard', function (ok) {
+                        if (!ok) { return; }
+                        Dashboard.showLoadingMsg();
+                        ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl(endpoint), contentType: 'application/json', data: JSON.stringify({ profile: profileSelect.value, confirm: true }) })
+                            .then(function () { return Promise.all([loadNativePolicy(), loadJournal(), loadConfig()]); })
+                            .catch(function (error) { Dashboard.alert(error && error.responseJSON ? error.responseJSON : (language === 'fr' ? 'La politique native n’a pas pu être modifiée.' : 'The native policy could not be changed.')); })
+                            .finally(function () { Dashboard.hideLoadingMsg(); });
+                    });
+                }
                 function decide(action) {
                     var ids = selectedIds();
                     if (!ids.length) { Dashboard.alert('Sélectionne au moins un média.'); return; }
@@ -225,11 +301,15 @@
                     });
                 }
                 function readProfilesForm() {
-                    return Array.prototype.slice.call(profilesHost.querySelectorAll('[data-profile-index]')).map(function (card) {
+                    return Array.prototype.slice.call(profilesHost.querySelectorAll('[data-profile-index]')).map(function (card, index) {
                         function input(field) { return card.querySelector('[data-field="' + field + '"]'); }
                         function text(field) { return input(field).value.trim(); }
                         function bool(field) { return input(field).checked; }
-                        return { Name: text('name'), UserName: text('userName'), AllowedTag: text('allowedTag'), ReviewTag: text('reviewTag'), Rules: {
+                        var userId = text('userId');
+                        var user = jellyfinUsers.filter(function (candidate) { return (candidate.id || candidate.Id) === userId; })[0];
+                        var previous = profiles()[index] || {};
+                        return { Name: text('name'), UserName: user ? (user.name || user.Name) : '', UserId: userId, AllowedTag: text('allowedTag'), ReviewTag: text('reviewTag'),
+                            NativeTagProtectionEnabled: bool('nativeTagProtection'), ManagedAllowedTags: list(previous.ManagedAllowedTags), Rules: {
                             Enabled: bool('enabled'), AutoApproveSafeMatches: bool('autoApprove'), IncludeMovies: bool('movies'), IncludeSeries: bool('series'),
                             LookbackDays: Math.max(1, Math.min(90, Number(text('lookback')) || 14)), AllowedRatings: toList(text('ratings')),
                             RequiredGenreGroups: toGroups(text('genreGroups')), BlockedGenres: toList(text('blockedGenres')) } };
@@ -248,7 +328,7 @@
                     Dashboard.showLoadingMsg();
                     ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                         rebuildProfileSelect(); renderProfiles();
-                        return Promise.all([loadQueue(), loadJournal()]);
+                        return Promise.all([loadQueue(), loadJournal(), loadNativePolicy()]);
                     }).then(function () { Dashboard.alert('Configuration FamilyGuard enregistrée.'); })
                       .catch(function () { Dashboard.alert('Impossible d\'enregistrer la configuration.'); })
                       .finally(function () { Dashboard.hideLoadingMsg(); });
@@ -276,17 +356,28 @@
                         renderJournal(value(config, 'DecisionLog', 'decisionLog', []));
                     });
                 }
-                page.addEventListener('pageshow', function () { applyLanguage(); loadConfig().then(function () { return Promise.all([loadQueue(), loadJournal()]); }); });
+                function loadUsers() {
+                    return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('FamilyGuard/Users') }).then(function (users) {
+                        jellyfinUsers = list(users);
+                    }).catch(function () { jellyfinUsers = []; });
+                }
+                page.addEventListener('pageshow', function () {
+                    applyLanguage();
+                    loadUsers().then(loadConfig).then(function () { return Promise.all([loadQueue(), loadJournal(), loadNativePolicy()]); });
+                });
                 languageSelect.addEventListener('change', function () { language = languageSelect.value; localStorage.setItem('familyguard-language', language); applyLanguage(); renderProfiles(); renderQueue(); loadJournal(); });
                 page.querySelector('#FamilyGuardRefresh').addEventListener('click', function () { Promise.all([loadQueue(), loadJournal()]); });
                 page.querySelector('#FamilyGuardApprove').addEventListener('click', function () { decide('approve'); });
                 page.querySelector('#FamilyGuardReject').addEventListener('click', function () { decide('reject'); });
                 page.querySelector('#FamilyGuardPreview').addEventListener('click', function () { runScan(false); });
                 page.querySelector('#FamilyGuardApplyScan').addEventListener('click', function () { runScan(true); });
+                page.querySelector('#FamilyGuardPreviewNativePolicy').addEventListener('click', loadNativePolicy);
+                page.querySelector('#FamilyGuardApplyNativePolicy').addEventListener('click', function () { changeNativePolicy('apply'); });
+                page.querySelector('#FamilyGuardRestoreNativePolicy').addEventListener('click', function () { changeNativePolicy('restore'); });
                 page.querySelector('#FamilyGuardAddProfile').addEventListener('click', function () { var all = profiles(); all.push(normalProfile({ Name: language === 'fr' ? 'Nouveau profil' : 'New profile', AllowedTag: 'FamilyGuard-Allowed', ReviewTag: 'FamilyGuard-Review' })); setProfiles(all); renderProfiles(); });
                 page.querySelector('#FamilyGuardSaveConfig').addEventListener('click', saveConfig);
                 profilesHost.addEventListener('click', function (event) { var button = event.target.closest('.familyguard-remove-profile'); if (!button) { return; } var all = profiles(); all.splice(Number(button.dataset.index), 1); setProfiles(all); renderProfiles(); });
-                profileSelect.addEventListener('change', function () { Promise.all([loadQueue(), loadJournal()]); });
+                profileSelect.addEventListener('change', function () { Promise.all([loadQueue(), loadJournal(), loadNativePolicy()]); });
             }());
         </script>
     </div>

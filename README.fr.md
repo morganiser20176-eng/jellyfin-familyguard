@@ -7,12 +7,15 @@ FamilyGuard est un flux local de validation parentale pour Jellyfin. Il permet �
 ## Fonctionnalités
 
 - Plusieurs profils protégés, chacun avec une étiquette autorisée et une étiquette « à vérifier ».
+- Association facultative d’un profil à un compte Jellyfin, avec aperçu d’une mise à jour réversible de la politique native d’étiquettes autorisées. Une fois confirmée, cette protection est appliquée par le serveur à tous les clients authentifiés.
 - Validation ou refus par lot depuis une file de revue.
 - Règles prudentes, facultatives et déclenchées manuellement pour les médias récemment ajoutés.
 - Journal local des 500 dernières décisions de marquage.
 - Raccourci FamilyGuard dans l’administration Jellyfin.
 
 FamilyGuard complète le contrôle parental natif de Jellyfin. Pour chaque compte enfant, conservez les restrictions natives et n'autorisez que l'**étiquette autorisée** configurée pour son profil.
+
+La protection native est facultative. FamilyGuard affiche la politique avant/après et demande une seconde confirmation avant toute modification. Les autres étiquettes autorisées sont conservées et seul ce que FamilyGuard a ajouté peut être retiré par le plugin.
 
 ## Confidentialité et sécurité
 

@@ -16,12 +16,14 @@ namespace Jellyfin.Plugin.FamilyGuard.Api;
 public sealed class FamilyGuardController : ControllerBase
 {
     private readonly ILibraryManager _libraryManager;
+    private readonly IUserManager _userManager;
     private static readonly object ConfigurationLock = new();
 
     /// <summary>Initializes a new instance of the <see cref="FamilyGuardController"/> class.</summary>
-    public FamilyGuardController(ILibraryManager libraryManager)
+    public FamilyGuardController(ILibraryManager libraryManager, IUserManager userManager)
     {
         _libraryManager = libraryManager;
+        _userManager = userManager;
     }
 
     /// <summary>Gets the review queue for a protected profile.</summary>
@@ -179,6 +181,51 @@ public sealed class FamilyGuardController : ControllerBase
             .ToList();
         return Ok(result);
     }
+
+    /// <summary>Lists local Jellyfin users that can be linked to a protected profile.</summary>
+    [HttpGet("Users")]
+    public ActionResult<IReadOnlyList<JellyfinUserDto>> GetUsers()
+    {
+        var users = _userManager.GetUsers()
+            .Select(user =>
+            {
+                var policy = _userManager.GetUserDto(user).Policy;
+                return new JellyfinUserDto
+                {
+                    Id = user.Id.ToString(),
+                    Name = user.Username,
+                    IsAdministrator = policy.IsAdministrator,
+                    IsDisabled = policy.IsDisabled
+                };
+            })
+            .OrderBy(user => user.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        return Ok(users);
+    }
+
+    /// <summary>Previews the native Jellyfin allowed-tag policy that FamilyGuard would apply.</summary>
+    [HttpGet("NativePolicy/Preview")]
+    public ActionResult<NativePolicyPreviewDto> PreviewNativePolicy([FromQuery] string? profile = null)
+    {
+        var selectedProfile = FindProfile(profile);
+        if (selectedProfile is null)
+        {
+            return NotFound("FamilyGuard profile not found.");
+        }
+
+        return Ok(BuildNativePolicyPreview(selectedProfile, restore: false));
+    }
+
+    /// <summary>Applies the previewed native Jellyfin allowed-tag policy for a protected profile.</summary>
+    [HttpPost("NativePolicy/Apply")]
+    public Task<ActionResult<NativePolicyPreviewDto>> ApplyNativePolicy([FromBody] NativePolicyRequest request)
+        => ChangeNativePolicy(request, restore: false);
+
+    /// <summary>Removes only the allowed tags previously managed by FamilyGuard from a linked user.</summary>
+    [HttpPost("NativePolicy/Restore")]
+    public Task<ActionResult<NativePolicyPreviewDto>> RestoreNativePolicy([FromBody] NativePolicyRequest request)
+        => ChangeNativePolicy(request, restore: true);
 
     /// <summary>Previews or explicitly applies conservative rules to recently added, unclassified media.</summary>
     [HttpPost("Scan")]
@@ -351,6 +398,148 @@ public sealed class FamilyGuardController : ControllerBase
                 plugin.Configuration.DecisionLog.RemoveRange(500, plugin.Configuration.DecisionLog.Count - 500);
             }
 
+            plugin.SaveConfiguration(plugin.Configuration);
+        }
+    }
+
+    private async Task<ActionResult<NativePolicyPreviewDto>> ChangeNativePolicy(NativePolicyRequest request, bool restore)
+    {
+        if (!request.Confirm)
+        {
+            return BadRequest("Explicit confirmation is required before changing a Jellyfin user policy.");
+        }
+
+        var selectedProfile = FindProfile(request.Profile);
+        if (selectedProfile is null)
+        {
+            return NotFound("FamilyGuard profile not found.");
+        }
+
+        var preview = BuildNativePolicyPreview(selectedProfile, restore);
+        if (!preview.CanApply)
+        {
+            return BadRequest(preview.Warning);
+        }
+
+        var user = _userManager.GetUserById(Guid.Parse(preview.UserId));
+        if (user is null)
+        {
+            return NotFound("The linked Jellyfin user no longer exists.");
+        }
+
+        var policy = _userManager.GetUserDto(user).Policy;
+        policy.AllowedTags = preview.DesiredAllowedTags;
+        await _userManager.UpdatePolicyAsync(user.Id, policy).ConfigureAwait(false);
+
+        selectedProfile.UserName = user.Username;
+        selectedProfile.ManagedAllowedTags = restore ? [] : [selectedProfile.AllowedTag];
+        selectedProfile.NativeTagProtectionEnabled = !restore;
+        SaveProfileConfiguration();
+        WriteJournal(
+        [
+            new DecisionLogEntry
+            {
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Profile = selectedProfile.Name,
+                ItemId = user.Id.ToString(),
+                ItemName = user.Username,
+                Action = restore ? "native_policy_restored" : "native_policy_applied",
+                Source = "NativePolicy",
+                Details = restore
+                    ? "Only FamilyGuard-managed allowed tags were removed from the Jellyfin policy."
+                    : "Jellyfin allowed-tag policy updated after an administrator preview."
+            }
+        ]);
+
+        return Ok(BuildNativePolicyPreview(selectedProfile, restore));
+    }
+
+    private NativePolicyPreviewDto BuildNativePolicyPreview(ProtectedProfile profile, bool restore)
+    {
+        var preview = new NativePolicyPreviewDto { Profile = profile.Name, UserId = profile.UserId };
+        if (!Guid.TryParse(profile.UserId, out var userId))
+        {
+            preview.Warning = "Link a Jellyfin user before enabling native protection.";
+            return preview;
+        }
+
+        if (!restore && !profile.NativeTagProtectionEnabled)
+        {
+            preview.Warning = "Enable native tag protection in the FamilyGuard profile, save the configuration, then review this preview again.";
+            return preview;
+        }
+
+        var user = _userManager.GetUserById(userId);
+        if (user is null)
+        {
+            preview.Warning = "The linked Jellyfin user could not be found.";
+            return preview;
+        }
+
+        var userPolicy = _userManager.GetUserDto(user).Policy;
+        preview.UserName = user.Username;
+        if (userPolicy.IsAdministrator)
+        {
+            preview.Warning = "An administrator account cannot be used as a protected FamilyGuard profile.";
+            return preview;
+        }
+
+        if (userPolicy.IsDisabled)
+        {
+            preview.Warning = "The linked Jellyfin user is disabled.";
+            return preview;
+        }
+
+        var conflict = (Plugin.Instance?.Configuration.Profiles ?? [])
+            .Any(other => !ReferenceEquals(other, profile)
+                && string.Equals(other.UserId, profile.UserId, StringComparison.OrdinalIgnoreCase)
+                && other.NativeTagProtectionEnabled);
+        if (conflict)
+        {
+            preview.Warning = "This Jellyfin user is already protected by another active FamilyGuard profile.";
+            return preview;
+        }
+
+        var current = NormalizeTags(userPolicy.AllowedTags);
+        var managed = NormalizeTags(profile.ManagedAllowedTags);
+        var desired = current.Where(tag => !managed.Contains(tag, StringComparer.OrdinalIgnoreCase));
+        if (!restore)
+        {
+            desired = desired.Append(profile.AllowedTag.Trim());
+        }
+
+        preview.CurrentAllowedTags = current;
+        preview.DesiredAllowedTags = NormalizeTags(desired);
+        preview.AddedAllowedTags = preview.DesiredAllowedTags
+            .Where(tag => !current.Contains(tag, StringComparer.OrdinalIgnoreCase))
+            .ToArray();
+        preview.RemovedAllowedTags = current
+            .Where(tag => !preview.DesiredAllowedTags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+            .ToArray();
+        preview.CanApply = true;
+        return preview;
+    }
+
+    private static string[] NormalizeTags(IEnumerable<string>? tags)
+    {
+        return (tags ?? [])
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => tag.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(tag => tag, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+    }
+
+    private static void SaveProfileConfiguration()
+    {
+        var plugin = Plugin.Instance;
+        if (plugin is null)
+        {
+            return;
+        }
+
+        lock (ConfigurationLock)
+        {
             plugin.SaveConfiguration(plugin.Configuration);
         }
     }
