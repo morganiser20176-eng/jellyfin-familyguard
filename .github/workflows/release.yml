@@ -33,28 +33,33 @@ jobs:
           CHECKSUM="$(sha256sum "dist/${ZIP}" | awk '{print $1}')"
           SOURCE_URL="${SERVER_URL}/${REPOSITORY}/releases/download/${TAG}/${ZIP}"
           TIMESTAMP="$(date --utc +%Y-%m-%dT%H:%M:%S.0000000Z)"
-          cat > dist/manifest.json <<EOF
-          [
-            {
-              "category": "General",
-              "description": "Local parental review queues, profile rules, and a private decision log for Jellyfin.",
-              "guid": "cace56d8-9077-4ced-b014-a0d703d83876",
-              "name": "FamilyGuard",
-              "overview": "Local parental review workflow for Jellyfin.",
-              "owner": "FamilyGuard contributors",
-              "versions": [
-                {
-                  "changelog": "See the GitHub release notes.",
-                  "targetAbi": "10.11.11.0",
-                  "timestamp": "${TIMESTAMP}",
-                  "version": "${VERSION}",
-                  "sourceUrl": "${SOURCE_URL}",
-                  "checksum": "${CHECKSUM}"
-                }
-              ]
-            }
-          ]
-          EOF
+          META="Jellyfin.Plugin.FamilyGuard/meta.json"
+          python3 - "$META" "$TIMESTAMP" "$VERSION" "$SOURCE_URL" "$CHECKSUM" <<'PY' > dist/manifest.json
+          import json
+          import sys
+
+          meta_path, timestamp, version, source_url, checksum = sys.argv[1:]
+          with open(meta_path, encoding="utf-8") as handle:
+              meta = json.load(handle)
+
+          manifest = [{
+              "category": meta["category"],
+              "description": meta["description"],
+              "guid": meta["guid"],
+              "name": meta["name"],
+              "overview": meta["overview"],
+              "owner": meta["owner"],
+              "versions": [{
+                  "changelog": meta["changelog"],
+                  "targetAbi": meta["targetAbi"],
+                  "timestamp": timestamp,
+                  "version": version,
+                  "sourceUrl": source_url,
+                  "checksum": checksum,
+              }],
+          }]
+          print(json.dumps(manifest))
+          PY
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}

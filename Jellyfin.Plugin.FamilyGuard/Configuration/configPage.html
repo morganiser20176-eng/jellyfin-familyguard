@@ -268,9 +268,13 @@
                 }
                 function loadNativePolicy() {
                     if (!profileSelect.value) { nativePolicyHost.innerHTML = ''; return Promise.resolve(); }
+                    nativePolicyHost.textContent = language === 'fr' ? 'Chargement de l’aperçu de protection…' : 'Loading protection preview…';
                     return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('FamilyGuard/NativePolicy/Preview?profile=' + encodeURIComponent(profileSelect.value)) })
                         .then(renderNativePolicy)
-                        .catch(function () { nativePolicyHost.textContent = language === 'fr' ? 'Impossible de prévisualiser la protection native.' : 'Unable to preview native protection.'; });
+                        .catch(function (error) {
+                            var status = error && (error.status || error.statusCode);
+                            nativePolicyHost.textContent = (language === 'fr' ? 'Impossible de prévisualiser la protection native' : 'Unable to preview native protection') + (status ? ' (HTTP ' + status + ')' : '.') ;
+                        });
                 }
                 function changeNativePolicy(action) {
                     if (!profileSelect.value) { return; }

@@ -1,6 +1,6 @@
 {
   "category": "General",
-  "changelog": "Fix Jellyfin 10.11 profile editor rendering; native-policy preview can now display correctly.",
+  "changelog": "Show native-policy loading and HTTP errors clearly; publish Morgan as plugin developer.",
   "description": "Local parental review queues, profile rules, and server-enforced allowed-tag protection for Jellyfin.",
   "guid": "cace56d8-9077-4ced-b014-a0d703d83876",
   "name": "FamilyGuard",
@@ -8,7 +8,7 @@
   "owner": "Morgan",
   "targetAbi": "10.11.11.0",
   "timestamp": "2026-11-27T18:45:00.0000000Z",
-  "version": "0.4.3.0",
+  "version": "0.4.4.0",
   "status": "Active",
   "autoUpdate": false,
   "assemblies": []
