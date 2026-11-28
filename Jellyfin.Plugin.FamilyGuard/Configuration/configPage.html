@@ -226,7 +226,7 @@
                 function loadQueue() {
                     if (!profileSelect.value) { items = []; renderQueue(); return Promise.resolve(); }
                     Dashboard.showLoadingMsg();
-                    return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('FamilyGuard/Queue?profile=' + encodeURIComponent(profileSelect.value)) }).then(function (data) {
+                    return ApiClient.ajax({ type: 'GET', dataType: 'json', url: ApiClient.getUrl('FamilyGuard/Queue?profile=' + encodeURIComponent(profileSelect.value)) }).then(function (data) {
                         items = data.items || data.Items || []; renderQueue();
                     }).catch(function () { Dashboard.alert('Impossible de charger la file FamilyGuard.'); }).finally(function () { Dashboard.hideLoadingMsg(); });
                 }
@@ -239,7 +239,7 @@
                 }
                 function loadJournal() {
                     if (!profileSelect.value) { journalHost.innerHTML = ''; return Promise.resolve(); }
-                    return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('FamilyGuard/Journal?profile=' + encodeURIComponent(profileSelect.value) + '&take=100') }).then(function (entries) {
+                    return ApiClient.ajax({ type: 'GET', dataType: 'json', url: ApiClient.getUrl('FamilyGuard/Journal?profile=' + encodeURIComponent(profileSelect.value) + '&take=100') }).then(function (entries) {
                         renderJournal(entries);
                     }).catch(function () {
                         if (!journalHost.innerHTML) { journalHost.innerHTML = '<p class="fieldDescription">Impossible d’actualiser le journal.</p>'; }
@@ -293,7 +293,7 @@
                 function loadNativePolicy() {
                     if (!profileSelect.value) { nativePolicyHost.innerHTML = ''; return Promise.resolve(); }
                     nativePolicyHost.textContent = language === 'fr' ? 'Chargement de l’aperçu de protection…' : 'Loading protection preview…';
-                    return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('FamilyGuard/NativePolicy/Preview?profile=' + encodeURIComponent(profileSelect.value)) })
+                    return ApiClient.ajax({ type: 'GET', dataType: 'json', url: ApiClient.getUrl('FamilyGuard/NativePolicy/Preview?profile=' + encodeURIComponent(profileSelect.value)) })
                         .then(function (preview) { renderNativePolicy(preview); return preview; })
                         .catch(function (error) {
                             var status = error && (error.status || error.statusCode);
@@ -365,7 +365,7 @@
                     if (!profileSelect.value) { Dashboard.alert('Configure puis enregistre au moins un profil.'); return; }
                     function start() {
                         Dashboard.showLoadingMsg();
-                        ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('FamilyGuard/Scan'), contentType: 'application/json', data: JSON.stringify({ profile: profileSelect.value, apply: apply }) }).then(function (result) {
+                        ApiClient.ajax({ type: 'POST', dataType: 'json', url: ApiClient.getUrl('FamilyGuard/Scan'), contentType: 'application/json', data: JSON.stringify({ profile: profileSelect.value, apply: apply }) }).then(function (result) {
                             var considered = value(result, 'Considered', 'considered', 0);
                             var safeMatches = value(result, 'SafeMatches', 'safeMatches', 0);
                             var reviewCandidates = value(result, 'ReviewCandidates', 'reviewCandidates', 0);
@@ -385,7 +385,7 @@
                     });
                 }
                 function loadUsers() {
-                    return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('FamilyGuard/Users') }).then(function (users) {
+                    return ApiClient.ajax({ type: 'GET', dataType: 'json', url: ApiClient.getUrl('FamilyGuard/Users') }).then(function (users) {
                         jellyfinUsers = list(users);
                     }).catch(function () { jellyfinUsers = []; });
                 }
