@@ -245,32 +245,46 @@
                         if (!journalHost.innerHTML) { journalHost.innerHTML = '<p class="fieldDescription">Impossible d’actualiser le journal.</p>'; }
                     });
                 }
-                function renderNativePolicy(preview) {
+                function normalizeNativePolicyPreview(preview) {
+                    if (typeof preview === 'string') {
+                        try { return JSON.parse(preview); } catch (error) { return null; }
+                    }
+                    return preview && typeof preview === 'object' ? preview : null;
+                }
+                function nativePolicyLines(rawPreview) {
+                    var preview = normalizeNativePolicyPreview(rawPreview);
+                    if (!preview) { return [language === 'fr' ? 'Réponse de prévisualisation invalide.' : 'Invalid preview response.']; }
                     var current = list(preview.currentAllowedTags || preview.CurrentAllowedTags);
                     var desired = list(preview.desiredAllowedTags || preview.DesiredAllowedTags);
                     var added = list(preview.addedAllowedTags || preview.AddedAllowedTags);
                     var removed = list(preview.removedAllowedTags || preview.RemovedAllowedTags);
                     var warning = preview.warning || preview.Warning;
                     if (warning) {
-                        nativePolicyHost.innerHTML = '<strong>' + esc(language === 'fr' ? 'Action non disponible : ' : 'Action unavailable: ') + '</strong>' + esc(warning);
-                        return;
+                        return [(language === 'fr' ? 'Action non disponible : ' : 'Action unavailable: ') + warning];
                     }
                     var label = language === 'fr' ? 'Compte : ' : 'Account: ';
                     var before = language === 'fr' ? 'Étiquettes autorisées actuelles : ' : 'Current allowed tags: ';
                     var after = language === 'fr' ? 'Après application : ' : 'After applying: ';
                     var changes = language === 'fr' ? 'Ajoutées : ' : 'Added: ';
                     var removals = language === 'fr' ? 'Retirées : ' : 'Removed: ';
-                    nativePolicyHost.innerHTML = '<div><strong>' + esc(label) + '</strong>' + esc(preview.userName || preview.UserName || '') + '</div>'
-                        + '<div>' + esc(before) + esc(current.join(', ') || '—') + '</div>'
-                        + '<div>' + esc(after) + esc(desired.join(', ') || '—') + '</div>'
-                        + '<div>' + esc(changes) + esc(added.join(', ') || '—') + '</div>'
-                        + '<div>' + esc(removals) + esc(removed.join(', ') || '—') + '</div>';
+                    return [
+                        label + (preview.userName || preview.UserName || '—'),
+                        before + (current.join(', ') || '—'),
+                        after + (desired.join(', ') || '—'),
+                        changes + (added.join(', ') || '—'),
+                        removals + (removed.join(', ') || '—')
+                    ];
+                }
+                function renderNativePolicy(preview) {
+                    nativePolicyHost.innerHTML = nativePolicyLines(preview).map(function (line, index) {
+                        return '<div' + (index === 0 ? '><strong>' : '>') + esc(line) + (index === 0 ? '</strong>' : '') + '</div>';
+                    }).join('');
                 }
                 function loadNativePolicy() {
                     if (!profileSelect.value) { nativePolicyHost.innerHTML = ''; return Promise.resolve(); }
                     nativePolicyHost.textContent = language === 'fr' ? 'Chargement de l’aperçu de protection…' : 'Loading protection preview…';
                     return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('FamilyGuard/NativePolicy/Preview?profile=' + encodeURIComponent(profileSelect.value)) })
-                        .then(renderNativePolicy)
+                        .then(function (preview) { renderNativePolicy(preview); return preview; })
                         .catch(function (error) {
                             var status = error && (error.status || error.statusCode);
                             nativePolicyHost.textContent = (language === 'fr' ? 'Impossible de prévisualiser la protection native' : 'Unable to preview native protection') + (status ? ' (HTTP ' + status + ')' : '.') ;
@@ -375,7 +389,12 @@
                 page.querySelector('#FamilyGuardReject').addEventListener('click', function () { decide('reject'); });
                 page.querySelector('#FamilyGuardPreview').addEventListener('click', function () { runScan(false); });
                 page.querySelector('#FamilyGuardApplyScan').addEventListener('click', function () { runScan(true); });
-                page.querySelector('#FamilyGuardPreviewNativePolicy').addEventListener('click', loadNativePolicy);
+                page.querySelector('#FamilyGuardPreviewNativePolicy').addEventListener('click', function () {
+                    loadNativePolicy().then(function (preview) {
+                        if (!preview) { return; }
+                        Dashboard.alert({ title: 'FamilyGuard', message: nativePolicyLines(preview).join('\n') });
+                    });
+                });
                 page.querySelector('#FamilyGuardApplyNativePolicy').addEventListener('click', function () { changeNativePolicy('apply'); });
                 page.querySelector('#FamilyGuardRestoreNativePolicy').addEventListener('click', function () { changeNativePolicy('restore'); });
                 page.querySelector('#FamilyGuardAddProfile').addEventListener('click', function () { var all = profiles(); all.push(normalProfile({ Name: language === 'fr' ? 'Nouveau profil' : 'New profile', AllowedTag: 'FamilyGuard-Allowed', ReviewTag: 'FamilyGuard-Review' })); setProfiles(all); renderProfiles(); });
