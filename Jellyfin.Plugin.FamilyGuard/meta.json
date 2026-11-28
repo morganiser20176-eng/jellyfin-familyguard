@@ -1,6 +1,6 @@
 {
   "category": "General",
-  "changelog": "Show the native-policy preview in the page and in a confirmation dialog for Jellyfin 10.11.",
+  "changelog": "Read the legacy Jellyfin 10.11 response wrapper before displaying the native-policy preview.",
   "description": "Local parental review queues, profile rules, and server-enforced allowed-tag protection for Jellyfin.",
   "guid": "cace56d8-9077-4ced-b014-a0d703d83876",
   "name": "FamilyGuard",
@@ -8,7 +8,7 @@
   "owner": "Morgan",
   "targetAbi": "10.11.11.0",
   "timestamp": "2026-11-27T18:45:00.0000000Z",
-  "version": "0.4.5.0",
+  "version": "0.4.6.0",
   "status": "Active",
   "autoUpdate": false,
   "assemblies": []

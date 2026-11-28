@@ -246,10 +246,20 @@
                     });
                 }
                 function normalizeNativePolicyPreview(preview) {
-                    if (typeof preview === 'string') {
-                        try { return JSON.parse(preview); } catch (error) { return null; }
+                    var candidates = preview && typeof preview === 'object'
+                        ? [preview, preview.responseJSON, preview.response, preview.data, preview.body, preview.responseText, preview.text]
+                        : [preview];
+                    for (var index = 0; index < candidates.length; index++) {
+                        var candidate = candidates[index];
+                        if (typeof candidate === 'string') {
+                            try { candidate = JSON.parse(candidate); } catch (error) { continue; }
+                        }
+                        if (candidate && typeof candidate === 'object'
+                            && (candidate.Profile !== undefined || candidate.profile !== undefined || candidate.Warning !== undefined || candidate.warning !== undefined)) {
+                            return candidate;
+                        }
                     }
-                    return preview && typeof preview === 'object' ? preview : null;
+                    return null;
                 }
                 function nativePolicyLines(rawPreview) {
                     var preview = normalizeNativePolicyPreview(rawPreview);
