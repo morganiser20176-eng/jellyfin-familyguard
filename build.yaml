@@ -1,7 +1,7 @@
 ---
 name: "FamilyGuard"
 guid: "cace56d8-9077-4ced-b014-a0d703d83876"
-version: "0.4.1.0"
+version: "0.4.2.0"
 targetAbi: "10.11.11.0"
 framework: "net9.0"
 overview: "Local parental review and server-enforced profile protection for Jellyfin"
